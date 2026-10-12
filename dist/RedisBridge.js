@@ -1,23 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RedisBridge = void 0;
-/**
- * Redis 桥接（多实例支持）
- *
- * 问题：RoomManager 是纯内存的，一个画板的成员如果分散到两个进程，
- * A 在实例 1、B 在实例 2，两人画的东西互相看不到。
- *
- * 方案：
- *  - 广播走 Redis Pub/Sub：任一实例收到笔画，publish 到该画板频道，
- *    所有实例（含自己）订阅后转给本地成员。
- *  - 在线状态走 Redis Hash：以画板为 field、userId 为 member，TTL 自动过期，
- *    进程崩溃不会留下幽灵在线状态。
- *  - 操作日志仍为本地内存（跨实例补发需要更强的一致性方案，
- *    当前部署建议单实例 + 前置 LB 粘性会话；多实例需引入共享日志存储）
- *
- * 未配置 REDIS_URL 时全部降级为单实例内存模式，行为不变。
- */
-const redis_1 = require("redis");
 const crypto_1 = require("crypto");
 const BOARD_CHANNEL = (boardId) => `cocanvas:board:${boardId}`;
 const PRESENCE_KEY = (boardId) => `cocanvas:presence:${boardId}`;
@@ -43,7 +26,16 @@ class RedisBridge {
             return false;
         }
         try {
-            this.pub = (0, redis_1.createClient)({ url });
+            // 动态加载可选依赖 redis；未安装且配置了 REDIS_URL 时给出明确报错
+            let createClient;
+            try {
+                createClient = require('redis').createClient;
+            }
+            catch (e) {
+                console.error('[Redis] REDIS_URL is set but the optional "redis" package is not installed');
+                return false;
+            }
+            this.pub = createClient({ url });
             this.sub = this.pub.duplicate();
             this.pub.on('error', (e) => console.error('[Redis] pub error:', e.message));
             this.sub.on('error', (e) => console.error('[Redis] sub error:', e.message));
