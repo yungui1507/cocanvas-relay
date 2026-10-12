@@ -6,7 +6,7 @@ exports.Config = void 0;
  * 所有敏感值走环境变量，不硬编码
  */
 exports.Config = {
-    PORT: parseInt(process.env.PORT || '8080', 10),
+    PORT: parseInt(process.env.PORT || '3000', 10),
     /** WorkBuddy 云服务配置（来自 publicConfig） */
     WORKBUDDY: {
         endpoint: process.env.WB_ENDPOINT || '',
